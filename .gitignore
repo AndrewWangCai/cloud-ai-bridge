@@ -1,0 +1,32 @@
+# 依赖
+node_modules/
+**/node_modules/
+
+# 机密 / 用户数据（含密码哈希、API Key、会话）—— 绝不入库
+conduit/data/
+data/
+secrets/
+**/*.env
+.env
+conduit/data/users.json
+
+# 用户工作区与备份（用户代码 / 打包文件）
+workspace/
+workspaces/
+conduit/backups/
+backups/
+
+# 社区快照（用户公开项目的只读副本 / 下载包）
+conduit/community/
+community/
+
+# 测试产物
+screenshots/
+*.log
+
+# 临时
+*.tmp
+.DS_Store
+
+# 内部规划文档（含真实 IP/服务器/商业细节，勿入库）
+docs/*.docx

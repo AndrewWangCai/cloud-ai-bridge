@@ -1,0 +1,14 @@
+# 安全核心：以下文件改动需 owner 审核（GitHub 会自动请求 review）
+# 默认 owner
+*                           @AndrewWangCai
+
+# 安全核心层（鉴权/编排/预览代理/生命周期/凭证/部署/容器安全）—— 仅 owner
+/conduit/src/index.js        @AndrewWangCai
+/conduit/src/auth.js         @AndrewWangCai
+/conduit/src/orchestrator.js @AndrewWangCai
+/sandbox/Dockerfile          @AndrewWangCai
+/deploy/                     @AndrewWangCai
+
+# 低风险层可放宽审核（如需，可在此追加协作者）
+# /conduit/public/           @AndrewWangCai
+# /docs/                     @AndrewWangCai

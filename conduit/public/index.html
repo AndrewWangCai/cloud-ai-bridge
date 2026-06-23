@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Cloud AI Bridge · 手机遥控云端 AI 编程</title>
+
+  <!-- 全局错误捕获（保留：手机端调试） -->
+  <script>
+    window.onerror = function(message, source, lineno, colno, error) {
+      console.error("[JS Crash]", message, source, lineno, error);
+      return false;
+    };
+  </script>
+
+  <!-- 核心脚本前置加载，确保不被 CDN 卡死 -->
+  <script src="/app.js"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    :root {
+      /* Claude 暖色浅色主题 */
+      --bg: #F4F3EE;
+      --surface: #FFFFFF;
+      --surface-2: #FAF9F5;
+      --border: #E7E4DA;
+      --border-strong: #D9D5C9;
+      --text: #2A2A27;
+      --text-muted: #76746B;
+      --accent: #C96442;       /* 黏土橙：Claude 标志色 */
+      --accent-hover: #B5573A;
+      --accent-soft: rgba(201, 100, 66, 0.10);
+      --user-bubble: #C96442;
+      --ai-bubble: #FFFFFF;
+      --terminal-bg: #2A2A27;
+      --terminal-fg: #E9E6DD;
+      --ok: #3F8F5B;
+      --danger: #C0492F;
+      --font-mono: 'Fira Code', monospace;
+      --shadow-sm: 0 1px 2px rgba(40,38,34,0.06);
+      --shadow: 0 6px 24px rgba(40,38,34,0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    button { font-family: inherit; cursor: pointer; }
+    .hidden { display: none !important; }
+
+    /* ====================== 登录视图 ====================== */
+    #authView {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .auth-card {
+      width: 100%;
+      max-width: 380px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      padding: 2rem 1.6rem;
+    }
+    .auth-logo {
+      display: flex; align-items: center; justify-content: center;
+      gap: 0.6rem; margin-bottom: 0.4rem;
+    }
+    .auth-logo .spark {
+      width: 38px; height: 38px; border-radius: 10px;
+      background: var(--accent); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; box-shadow: var(--shadow-sm);
+    }
+    .auth-logo h1 { font-size: 1.2rem; font-weight: 600; }
+    .auth-sub { text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.6rem; }
+
+    .field { margin-bottom: 0.9rem; }
+    .field label { display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.35rem; }
+    .input {
+      width: 100%;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.75rem 0.9rem;
+      color: var(--text);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .input:focus { border-color: var(--accent); background: #fff; }
+
+    .btn-primary {
+      width: 100%;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 0.8rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      transition: background 0.15s;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-ghost {
+      background: transparent; border: none; color: var(--accent);
+      font-size: 0.85rem; font-weight: 500;
+    }
+    .auth-switch { text-align: center; margin-top: 1rem; font-size: 0.85rem; color: var(--text-muted); }
+    .auth-msg { font-size: 0.8rem; margin-top: 0.6rem; min-height: 1.1rem; }
+    .auth-msg.err { color: var(--danger); }
+    .auth-msg.ok { color: var(--ok); }
+
+    /* ====================== 顶部栏 ====================== */
+    header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.7rem 1rem;
+      background: rgba(244,243,238,0.85);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(16px);
+      z-index: 100;
+    }
+    .app-title { display: flex; align-items: center; gap: 0.55rem; font-size: 1rem; font-weight: 600; }
+    .app-title .spark {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: var(--accent); color: #fff;
+      display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+    }
+    .header-actions { display: flex; align-items: center; gap: 0.6rem; }
+    .status-indicator { display: flex; align-items: center; gap: 0.35rem; font-size: 0.72rem; color: var(--text-muted); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #C0492F; }
+    .dot.online { background: var(--ok); box-shadow: 0 0 0 3px rgba(63,143,91,0.18); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%{opacity:1}50%{opacity:.55}100%{opacity:1} }
+    .icon-btn {
+      background: var(--surface); border: 1px solid var(--border); color: var(--text);
+      width: 34px; height: 34px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+    }
+    .icon-btn.text { width: auto; padding: 0 0.7rem; gap: 0.3rem; font-size: 0.78rem; }
+
+    /* ====================== 通用表单元件 ====================== */
+    .row { display: flex; gap: 0.6rem; }
+    .row > * { flex: 1; }
+    .select, select.input { -webkit-appearance: none; appearance: none; }
+    .mini-btn {
+      background: var(--accent-soft); color: var(--accent);
+      border: 1px solid rgba(201,100,66,0.25); border-radius: 10px;
+      padding: 0.55rem 0.7rem; font-size: 0.8rem; font-weight: 600; white-space: nowrap;
+    }
+    .data-controls { display: flex; gap: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.9rem; }
+    .data-controls button {
+      flex: 1; border-radius: 10px; padding: 0.55rem; font-size: 0.75rem; font-weight: 600;
+      border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+    }
+    .data-controls .destroy { color: var(--danger); border-color: rgba(192,73,47,0.3); background: rgba(192,73,47,0.06); }
+
+    /* ====================== 设置弹层（侧栏导航 + 内容卡片） ====================== */
+    #settingsModal { position: fixed; inset: 0; z-index: 200; display: none; align-items: center; justify-content: center; background: rgba(40,38,34,0.40); backdrop-filter: blur(4px); padding: 1.2rem; }
+    #settingsModal.show { display: flex; }
+    .settings-card { width: 100%; max-width: 780px; height: min(84vh, 700px); background: var(--surface); border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden; }
+    .settings-top { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.2rem; border-bottom: 1px solid var(--border); }
+    .settings-top h2 { font-size: 1.05rem; font-weight: 650; display: flex; align-items: center; gap: 0.55rem; }
+    .settings-top h2 .spark { width: 26px; height: 26px; border-radius: 8px; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; }
+    .settings-top .close { width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-muted); font-size: 0.95rem; }
+    .settings-top .close:hover { background: var(--surface); color: var(--text); }
+    .settings-body { flex: 1; display: flex; min-height: 0; }
+    .settings-nav { width: 176px; flex-shrink: 0; border-right: 1px solid var(--border); padding: 0.8rem; display: flex; flex-direction: column; gap: 0.25rem; overflow-y: auto; background: var(--surface-2); }
+    .settings-nav button { display: flex; align-items: center; gap: 0.6rem; width: 100%; text-align: left; padding: 0.62rem 0.7rem; border: none; background: transparent; border-radius: 10px; font-size: 0.86rem; color: var(--text); font-weight: 500; transition: background 0.12s; }
+    .settings-nav button .ic { width: 18px; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+    .settings-nav button:hover { background: var(--surface); }
+    .settings-nav button.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+    .settings-nav button.active .ic { color: var(--accent); }
+    .settings-content { flex: 1; overflow-y: auto; padding: 1.3rem 1.4rem; }
+    .settings-section { display: none; flex-direction: column; gap: 1rem; }
+    .settings-section.active { display: flex; }
+    .sec-head { display: flex; flex-direction: column; gap: 0.25rem; }
+    .sec-head .t { font-size: 1.05rem; font-weight: 650; }
+    .sec-head .d { font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; }
+    .sec-card { border: 1px solid var(--border); border-radius: 14px; padding: 1rem 1.05rem; display: flex; flex-direction: column; gap: 0.8rem; background: var(--surface); }
+    .sec-card > .cap { font-size: 0.78rem; font-weight: 600; color: var(--text); }
+    .sec-card .hint { font-size: 0.76rem; color: var(--text-muted); line-height: 1.5; }
+    @media (max-width: 768px) {
+      #settingsModal { padding: 0; }
+      .settings-card { max-width: none; height: 100%; border-radius: 0; }
+      .settings-body { flex-direction: column; }
+      .settings-nav { width: auto; flex-direction: row; flex-wrap: wrap; border-right: none; border-bottom: 1px solid var(--border); gap: 0.4rem; padding: 0.6rem 0.7rem; }
+      .settings-nav button { flex: 0 0 auto; width: auto; white-space: nowrap; padding: 0.5rem 0.8rem; }
+      .settings-content { padding: 1.05rem; }
+    }
+
+    /* ====================== 主区域 ====================== */
+    main { flex: 1; position: relative; display: flex; overflow: hidden; }
+    .panel {
+      position: absolute; inset: 0; display: none; flex-direction: column;
+    }
+    @media (min-width: 769px) {
+      main { padding: 1rem; gap: 1rem; }
+      .panel {
+        position: static; display: flex !important;
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 18px; box-shadow: var(--shadow); overflow: hidden;
+      }
+      #chatPanel { width: 42%; }
+      #terminalPanel { width: 30%; }
+      #previewPanel { width: 28%; }
+    }
+    @media (max-width: 768px) { .panel.active { display: flex; } }
+
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.7rem 1rem; border-bottom: 1px solid var(--border);
+      font-size: 0.85rem; font-weight: 600; background: var(--surface-2);
+    }
+    .card-header .sub { font-weight: 400; font-size: 0.72rem; color: var(--text-muted); }
+    .card-header button { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.3rem 0.6rem; font-size: 0.72rem; color: var(--text); }
+    .terminal-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0.35rem; flex-wrap: wrap; }
+
+    /* 工具启动条 */
+    .tool-bar {
+      display: flex; gap: 0.4rem; padding: 0.6rem 1rem; flex-wrap: wrap;
+      border-bottom: 1px solid var(--border); background: var(--surface-2);
+    }
+    .tool-chip {
+      display: flex; align-items: center; gap: 0.35rem;
+      background: var(--surface); border: 1px solid var(--border-strong);
+      border-radius: 999px; padding: 0.35rem 0.75rem; font-size: 0.76rem; font-weight: 500; color: var(--text);
+    }
+    .tool-chip.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .chat-select {
+      width: auto; min-width: 132px; max-width: 220px;
+      background: var(--surface); border: 1px solid var(--border-strong); color: var(--text);
+      border-radius: 999px; padding: 0.36rem 0.72rem; font-size: 0.76rem; font-weight: 500;
+      outline: none;
+    }
+    .chat-select:focus { border-color: var(--accent); }
+    .model-custom-input { display: none; min-width: 150px; }
+    .model-status { align-self: center; font-size: 0.72rem; color: var(--text-muted); line-height: 1.35; }
+    .model-status.ok { color: var(--ok); }
+    .model-status.warn { color: var(--danger); }
+    .login-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+    .login-actions button { min-width: 0; }
+    @media (max-width: 768px) {
+      .chat-select { flex: 1 1 130px; min-width: 0; max-width: none; }
+      .model-status { flex-basis: 100%; }
+      .login-actions { grid-template-columns: 1fr; }
+      /* 手机端更大的可点区域，避免新对话/删除等小按钮点不中 */
+      .tool-chip { padding: 0.5rem 0.85rem; font-size: 0.8rem; }
+      #convBar .chat-select { flex: 1 1 100%; }
+      #convBar .tool-chip { flex: 1 1 auto; justify-content: center; }
+    }
+
+    /* 聊天流 */
+    .chat-messages { flex: 1; overflow-y: auto; padding: 1.1rem; display: flex; flex-direction: column; gap: 1rem; }
+    .msg-wrapper { display: flex; flex-direction: column; width: 100%; }
+    .msg-wrapper.user { align-items: flex-end; }
+    .msg-wrapper.ai { align-items: flex-start; }
+    .msg-bubble { max-width: 90%; padding: 0.75rem 0.95rem; font-size: 0.92rem; line-height: 1.5; }
+    .msg-wrapper.user .msg-bubble { background: var(--user-bubble); color: #fff; border-radius: 16px 16px 4px 16px; }
+    .msg-wrapper.ai .msg-bubble { background: var(--ai-bubble); color: var(--text); border: 1px solid var(--border); border-radius: 16px 16px 16px 4px; box-shadow: var(--shadow-sm); }
+
+    .step-card { margin-top: 0.55rem; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .step-header { padding: 0.45rem 0.7rem; font-size: 0.72rem; color: var(--text-muted); cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: var(--surface-2); }
+    .step-body { display: none; padding: 0.6rem; font-family: var(--font-mono); font-size: 0.72rem; color: var(--terminal-fg); background: var(--terminal-bg); max-height: 220px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+
+    .input-bar-container { padding: 0.85rem 1rem; border-top: 1px solid var(--border); }
+    .pill-input-box {
+      display: flex; align-items: flex-end; gap: 0.5rem;
+      background: var(--surface-2); border: 1px solid var(--border-strong);
+      border-radius: 22px; padding: 0.4rem 0.4rem 0.4rem 1rem;
+    }
+    .pill-input-box textarea {
+      flex: 1; background: transparent; border: none; color: var(--text);
+      font-size: 0.95rem; outline: none; resize: none; max-height: 120px;
+      font-family: inherit; line-height: 1.4; padding: 0.35rem 0;
+    }
+    .send-pill-btn {
+      background: var(--accent); border: none; width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0;
+    }
+    .send-pill-btn:disabled { background: var(--border-strong); }
+
+    /* 终端 */
+    .term-container { flex: 1; background: var(--terminal-bg); padding: 0.5rem; overflow: hidden; }
+    .terminal-login-helper {
+      display: none; border-bottom: 1px solid var(--border); background: #fffaf6;
+      padding: 0.75rem 0.9rem; gap: 0.55rem; flex-direction: column;
+    }
+    .login-helper-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .login-helper-title { font-size: 0.86rem; font-weight: 700; color: var(--text); }
+    .login-helper-close { border: none; background: transparent; color: var(--text-muted); font-size: 1rem; padding: 0.1rem 0.25rem; }
+    .login-helper-hint, .login-code-hint { font-size: 0.76rem; color: var(--text-muted); line-height: 1.45; }
+    .login-helper-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .login-helper-actions button, .login-code-row button { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 10px; padding: 0.4rem 0.62rem; font-size: 0.76rem; color: var(--text); }
+    .login-helper-actions button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .login-helper-actions button:disabled { opacity: 0.45; }
+    .login-url-box {
+      display: none; max-height: 62px; overflow: auto; word-break: break-all;
+      padding: 0.45rem 0.55rem; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--surface); font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted);
+    }
+    .login-code-row { display: flex; gap: 0.4rem; }
+    .login-code-row input { flex: 1; min-width: 0; padding: 0.45rem 0.55rem; font-size: 0.82rem; }
+
+    /* 预览 */
+    .preview-container { flex: 1; position: relative; background: #fff; }
+    .preview-iframe { width: 100%; height: 100%; border: none; }
+    .preview-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; color: var(--text-muted); font-size: 0.85rem; }
+    .preview-empty i { font-size: 1.8rem; opacity: 0.5; }
+
+    /* 移动浮动导航 */
+    .mobile-float-bar {
+      display: none; position: fixed; bottom: calc(18px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
+      background: var(--surface); border: 1px solid var(--border-strong);
+      padding: 0.3rem; border-radius: 26px; box-shadow: var(--shadow); z-index: 99; gap: 0.25rem;
+      transition: transform 0.18s ease, opacity 0.18s ease;
+    }
+    body.keyboard-open .mobile-float-bar { transform: translate(-50%, 140%); opacity: 0; pointer-events: none; }
+    .float-item { padding: 0.5rem 0.95rem; border-radius: 20px; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem; }
+    .float-item.active { background: var(--accent); color: #fff; }
+    .float-item.has-web { color: var(--ok); }
+    .float-item.has-web.active { color: #fff; }
+    .preview-toolbar { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; justify-content: flex-end; }
+    .preview-select { display: none; width: auto; padding: 0.2rem 0.4rem; font-size: 0.78rem; }
+    .preview-path-custom { display: none; width: 120px; padding: 0.2rem 0.4rem; font-size: 0.78rem; }
+    @media (max-width: 768px) {
+      .mobile-float-bar { display: flex; }
+      main { padding-bottom: 78px; }
+      body.keyboard-open main { padding-bottom: 0; }
+      body.keyboard-open .input-bar-container { padding-bottom: calc(0.9rem + env(safe-area-inset-bottom)); }
+      #previewPanel .card-header { align-items: stretch; flex-direction: column; gap: 0.55rem; padding: 0.75rem 1rem; }
+      #previewPanel .card-header > span:first-child { display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+      .preview-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) 44px 44px 44px; width: 100%; gap: 0.45rem; margin-top: 0; }
+      .preview-select { min-width: 0; height: 42px; font-size: 0.82rem; border-radius: 12px; }
+      #previewPort.preview-select { grid-column: 1 / -1; width: 100%; }
+      #previewPathSelect.preview-select { width: 100%; }
+      .preview-path-custom { grid-column: 1 / -1; width: 100%; height: 42px; font-size: 0.82rem; border-radius: 12px; }
+      .preview-toolbar button { width: 44px; height: 42px; padding: 0; border-radius: 12px; font-size: 0.9rem; }
+      .terminal-actions { gap: 0.3rem; }
+      .terminal-actions button { padding: 0.32rem 0.5rem; }
+      .terminal-login-helper { padding: 0.7rem 0.85rem; }
+      .login-helper-actions { display: grid; grid-template-columns: 1fr 1fr; }
+      .login-helper-actions button:first-child { grid-column: 1 / -1; }
+      .login-code-row { flex-direction: column; }
+      .login-code-row button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ====================== 登录视图 ====================== -->
+  <div id="authView">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <div class="spark"><i class="fa-solid fa-bolt"></i></div>
+        <h1>Cloud AI Bridge</h1>
+      </div>
+      <p class="auth-sub">手机当遥控器，云端沙箱里跑 Claude Code / Codex<br>
+        <a href="/landing.html" style="color:var(--accent);text-decoration:none;font-size:0.82rem;">📖 产品介绍</a>　·
+        <a href="/help.html" style="color:var(--accent);text-decoration:none;font-size:0.82rem;">❓ 使用帮助</a>
+      </p>
+
+      <div class="field">
+        <label>用户名</label>
+        <input type="text" id="authUser" class="input" autocomplete="username" placeholder="字母/数字/下划线">
+      </div>
+      <div class="field">
+        <label>密码</label>
+        <input type="password" id="authPass" class="input" autocomplete="current-password" placeholder="至少 6 位" onkeydown="if(event.key==='Enter')window.doAuth()">
+      </div>
+      <div class="field" id="emailField" style="display:none;">
+        <label>邮箱（注册需要，用于接收激活码）</label>
+        <input type="email" id="authEmail" class="input" autocomplete="email" placeholder="you@example.com">
+      </div>
+
+      <button class="btn-primary" id="authSubmit" onclick="window.doAuth()">登录</button>
+      <div class="auth-msg" id="authMsg"></div>
+      <div class="auth-switch">
+        <span id="authSwitchText">还没有账号？</span>
+        <button class="btn-ghost" id="authSwitchBtn" onclick="window.toggleAuthMode()">注册一个</button>
+        <span id="forgotWrap"> · <button class="btn-ghost" onclick="window.startForgot()">忘记密码？</button></span>
+      </div>
+
+      <!-- 激活面板：注册后/未激活登录时显示 -->
+      <div id="activatePanel" style="display:none;margin-top:0.6rem;border-top:1px solid var(--border,#e7e4da);padding-top:0.6rem;">
+        <div class="field">
+          <label>激活码（已发到 <span id="activateEmail"></span>）</label>
+          <input type="text" id="authCode" class="input" inputmode="numeric" placeholder="邮件里的 6 位激活码" onkeydown="if(event.key==='Enter')window.doActivate()">
+        </div>
+        <button class="btn-primary" onclick="window.doActivate()">激活并进入</button>
+        <div style="text-align:center;margin-top:0.4rem;">
+          <button class="btn-ghost" onclick="window.doResend()">没收到？重发激活码</button>
+        </div>
+      </div>
+
+      <!-- 找回密码面板 -->
+      <div id="resetPanel" style="display:none;margin-top:0.6rem;border-top:1px solid var(--border,#e7e4da);padding-top:0.6rem;">
+        <div class="field">
+          <label>注册邮箱</label>
+          <input type="email" id="resetEmail" class="input" autocomplete="email" placeholder="you@example.com">
+        </div>
+        <button class="btn-primary" id="resetSendBtn" onclick="window.sendResetCode()">发送验证码</button>
+        <div id="resetStep2" style="display:none;margin-top:0.6rem;">
+          <div class="field">
+            <label>验证码</label>
+            <input type="text" id="resetCode" class="input" inputmode="numeric" placeholder="邮件里的 6 位验证码">
+          </div>
+          <div class="field">
+            <label>新密码</label>
+            <input type="password" id="resetNewPass" class="input" placeholder="至少 6 位" onkeydown="if(event.key==='Enter')window.doReset()">
+          </div>
+          <button class="btn-primary" onclick="window.doReset()">重置密码并去登录</button>
+        </div>
+        <div style="text-align:center;margin-top:0.4rem;">
+          <button class="btn-ghost" onclick="window.cancelForgot()">← 返回登录</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================== 主应用视图 ====================== -->
+  <div id="appView" class="hidden" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+    <header>
+      <div class="app-title">
+        <div class="spark"><i class="fa-solid fa-bolt"></i></div>
+        <span>Cloud AI Bridge</span>
+      </div>
+      <div class="header-actions">
+        <div class="status-indicator">
+          <div id="statusDot" class="dot"></div>
+          <span id="statusText">离线</span>
+        </div>
+        <a id="adminLink" href="/admin.html" target="_blank" class="icon-btn" title="管理员后台" style="display:none;text-decoration:none;"><i class="fa-solid fa-shield-halved"></i></a>
+        <button class="icon-btn text" onclick="window.toggleSettings()"><i class="fa-solid fa-sliders"></i><span>设置</span></button>
+        <button class="icon-btn" title="退出登录" onclick="window.doLogout()"><i class="fa-solid fa-right-from-bracket"></i></button>
+      </div>
+    </header>
+
+    <!-- 设置弹层：左侧栏导航 + 右侧内容卡片 -->
+    <div id="settingsModal" onclick="if(event.target===this)window.toggleSettings()">
+      <div class="settings-card">
+        <div class="settings-top">
+          <h2><span class="spark"><i class="fa-solid fa-sliders"></i></span> 设置</h2>
+          <button class="close" onclick="window.toggleSettings()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="settings-body">
+          <nav class="settings-nav">
+            <button class="active" data-sec="project" onclick="window.selectSettingsSection('project')"><span class="ic"><i class="fa-solid fa-cube"></i></span><span>项目</span></button>
+            <button data-sec="creds" onclick="window.selectSettingsSection('creds')"><span class="ic"><i class="fa-solid fa-brain"></i></span><span>模型 / 账号</span></button>
+            <button data-sec="git" onclick="window.selectSettingsSection('git')"><span class="ic"><i class="fa-brands fa-github"></i></span><span>Git</span></button>
+            <button data-sec="collab" onclick="window.selectSettingsSection('collab')"><span class="ic"><i class="fa-solid fa-users"></i></span><span>协作 / 社区</span></button>
+            <button data-sec="data" onclick="window.selectSettingsSection('data')"><span class="ic"><i class="fa-solid fa-database"></i></span><span>数据</span></button>
+            <button data-sec="hermes" onclick="window.selectSettingsSection('hermes')"><span class="ic"><i class="fa-solid fa-robot"></i></span><span>Hermes</span></button>
+          </nav>
+          <div class="settings-content">
+
+            <!-- 项目 -->
+            <section class="settings-section active" data-sec="project">
+              <div class="sec-head"><div class="t">项目</div><div class="d">每个项目 = 一个隔离的 Docker 沙箱。免费 1 核 1G，默认 48h 到期自动备份。</div></div>
+              <div class="sec-card">
+                <div class="row">
+                  <select id="projectSelect" class="input select" onchange="window.onProjectChange()"></select>
+                  <input type="text" id="newProjectInput" class="input" placeholder="新项目名" style="flex:0.8;">
+                  <button class="mini-btn" onclick="window.createProject()">＋新建</button>
+                </div>
+                <div id="projectMeta" class="hint"></div>
+                <button class="btn-primary" id="connectBtn" onclick="window.connect()">
+                  <i class="fa-solid fa-bolt"></i> <span id="connectBtnText">激活并连接沙箱</span>
+                </button>
+              </div>
+            </section>
+
+            <!-- 模型 / 账号 -->
+            <section class="settings-section" data-sec="creds">
+              <div class="sec-head"><div class="t">模型 / 账号</div><div class="d">对话模式先选平台与模型；未绑定 Key 时会先提醒你接入账号，不再把底层 API 错误直接丢出来。</div></div>
+              <div class="sec-card">
+                <div class="cap">模型 API Key</div>
+                <div class="hint">🌏 本服务部署在香港/国内，<b>推荐用国产模型</b>（DeepSeek / GLM / Kimi / 通义）——稳定无地区限制；Claude / Codex 可能因 Anthropic·OpenAI 的地区限制无法连通。</div>
+                <div class="field" style="margin:0;"><label>Anthropic API Key（Claude）</label><input type="password" id="anthropicKey" class="input" placeholder="sk-ant-..."></div>
+                <div class="field" style="margin:0;"><label>OpenAI API Key（Codex）</label><input type="password" id="openaiKey" class="input" placeholder="sk-..."></div>
+                <div class="field" style="margin:0;"><label>DeepSeek API Key</label><input type="password" id="deepseekKey" class="input" placeholder="sk-..."></div>
+                <div class="field" style="margin:0;"><label>GLM / 智谱 API Key（OpenAI 兼容，经 ccr）</label><input type="password" id="glmKey" class="input" placeholder="智谱开放平台 API Key"></div>
+                <div class="field" style="margin:0;"><label>Kimi / Moonshot API Key</label><input type="password" id="kimiKey" class="input" placeholder="Moonshot 开放平台 API Key"></div>
+                <div class="field" style="margin:0;"><label>通义 / DashScope API Key</label><input type="password" id="qwenKey" class="input" placeholder="阿里云百炼 DashScope API Key"></div>
+                <button class="btn-primary" onclick="window.bindKeys()">🔐 保存并注入模型 Key</button>
+                <div class="hint">Key 只保存到当前项目并注入你的沙箱；留空不会覆盖已绑定的 Key。</div>
+              </div>
+              <div class="sec-card">
+                <div class="cap">会员号登录（Claude / Codex）</div>
+                <div id="loginStatus" class="hint">Claude：未标记　·　Codex：未标记</div>
+                <div class="login-actions">
+                  <button class="mini-btn" onclick="window.loginTool('claude')"><i class="fa-solid fa-right-to-bracket"></i> Claude 登录</button>
+                  <button class="mini-btn" onclick="window.markToolLoginDone('claude')"><i class="fa-solid fa-check"></i> Claude 已完成</button>
+                  <button class="mini-btn" onclick="window.loginTool('codex')"><i class="fa-solid fa-right-to-bracket"></i> Codex 登录</button>
+                  <button class="mini-btn" onclick="window.markToolLoginDone('codex')"><i class="fa-solid fa-check"></i> Codex 已完成</button>
+                </div>
+                <div class="data-controls" style="border-top:none;padding-top:0;">
+                  <button onclick="window.clearToolLoginDone('claude')">清除 Claude 标记</button>
+                  <button onclick="window.clearToolLoginDone('codex')">清除 Codex 标记</button>
+                </div>
+                <div class="hint">先在「项目」里连接沙箱，再点登录按钮；终端完成设备码/网页登录后，回这里点“已完成”。DeepSeek 只支持 API Key。</div>
+              </div>
+              <div class="sec-card">
+                <div class="cap">项目说明（写入 CLAUDE.md / AGENTS.md）</div>
+                <textarea id="projectBrief" class="input" rows="3" placeholder="例：仿淘宝商城前端，HTML/CSS/JS，重点首页和商品列表"></textarea>
+                <button class="mini-btn" onclick="window.bindKeys()">保存项目说明</button>
+              </div>
+            </section>
+
+            <!-- Git / GitHub -->
+            <section class="settings-section" data-sec="git">
+              <div class="sec-head"><div class="t">Git / GitHub</div><div class="d">把代码保存到你自己的仓库。</div></div>
+              <div class="sec-card">
+                <div class="cap">GitHub Token（免密 clone / push）</div>
+                <div class="hint">没有 Token？点这里直接去生成（已勾好 repo 权限）：<a href="https://github.com/settings/tokens/new?scopes=repo&description=Cloud%20AI%20Bridge" target="_blank" rel="noopener" style="color:var(--accent);">🔗 创建 GitHub Token</a>　→ 生成后复制粘贴到下面。用户名见 <a href="https://github.com/settings/profile" target="_blank" rel="noopener" style="color:var(--accent);">个人资料</a>。</div>
+                <div class="row">
+                  <input type="text" id="gitUser" class="input" placeholder="GitHub 用户名">
+                  <input type="text" id="gitEmail" class="input" placeholder="邮箱（可选）">
+                </div>
+                <input type="password" id="githubToken" class="input" placeholder="GitHub Token (ghp_... 需 repo 权限)">
+                <button class="mini-btn" style="width:100%;" onclick="window.bindKeys()">保存 GitHub 凭证</button>
+              </div>
+              <div class="sec-card">
+                <div class="cap">Git 助手（查看状态 + 一键复制命令）</div>
+                <div id="gitStatus" class="hint">点「刷新」查看当前项目 Git 状态</div>
+                <div class="row">
+                  <input type="text" id="gitRemoteInput" class="input" placeholder="你的仓库地址 https://github.com/你/仓库.git">
+                  <button class="mini-btn" style="flex:0 0 auto;" onclick="window.refreshGit()">🔄 刷新</button>
+                </div>
+                <pre id="gitCmds" style="white-space:pre-wrap;font-size:0.74rem;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:0.6rem;margin:0;overflow:auto;"></pre>
+                <button class="mini-btn" style="width:100%;" onclick="window.copyGitCmds()">📋 复制全部 Git 命令</button>
+              </div>
+              <div class="sec-card">
+                <div class="cap">GitHub 一键（OAuth · 推荐）</div>
+                <div id="ghStatus" class="hint">未连接</div>
+                <button id="ghConnectBtn" class="mini-btn" style="width:100%;" onclick="window.connectGithub()">用 GitHub 连接</button>
+                <div id="ghActions" style="display:none;flex-direction:column;gap:0.6rem;">
+                  <div class="row" style="align-items:center;">
+                    <input type="text" id="ghRepoName" class="input" placeholder="新仓库名">
+                    <label style="font-size:0.78rem;white-space:nowrap;"><input type="checkbox" id="ghPrivate" checked> 私有</label>
+                    <button class="mini-btn" style="flex:0 0 auto;" onclick="window.ghCreateRepo()">建仓</button>
+                  </div>
+                  <input type="text" id="ghRepoFull" class="input" placeholder="一键 PR 目标：owner/repo">
+                  <input type="text" id="ghPrTitle" class="input" placeholder="PR 标题（可选）">
+                  <button class="mini-btn" style="width:100%;" onclick="window.ghOpenPR()">🚀 一键提交并开 PR</button>
+                  <div style="text-align:center;"><button class="btn-ghost" style="font-size:0.76rem;" onclick="window.disconnectGithub()">断开 GitHub</button></div>
+                </div>
+              </div>
+            </section>
+
+            <!-- 协作 / 社区 -->
+            <section class="settings-section" data-sec="collab">
+              <div class="sec-head"><div class="t">协作 / 社区</div><div class="d">邀请别人共建，或把作品公开给大家观赏。</div></div>
+              <div class="sec-card">
+                <div class="cap">协作房间（多人 + 多 AI 共建）</div>
+                <div class="hint">邀请别人进你这个项目一起做；对方在项目下拉里会看到「👥协作」。</div>
+                <div class="row">
+                  <input type="text" id="collabInvite" class="input" placeholder="协作者用户名">
+                  <button class="mini-btn" style="flex:0 0 auto;" onclick="window.inviteCollaborator()">邀请</button>
+                </div>
+                <div id="collabList" class="hint"></div>
+              </div>
+              <div class="sec-card">
+                <div class="cap">发布到社区</div>
+                <div id="communityStatus" class="hint">把这个项目公开给大家观赏；仅你本人可发布。</div>
+                <input type="text" id="communityTitle" class="input" placeholder="作品标题">
+                <textarea id="communityDesc" class="input" rows="2" placeholder="一句话介绍你的作品"></textarea>
+                <select id="communityLevel" class="input">
+                  <option value="view">仅观赏（别人能看，不能下载/拉取）</option>
+                  <option value="fork">可获取（别人可下载/拉取到自己那）</option>
+                </select>
+                <div class="data-controls">
+                  <button onclick="window.publishCommunity()">🌃 发布</button>
+                  <button onclick="window.unpublishCommunity()">撤下</button>
+                  <button onclick="window.open('/community.html','_blank')">逛社区</button>
+                </div>
+              </div>
+            </section>
+
+            <!-- 数据 -->
+            <section class="settings-section" data-sec="data">
+              <div class="sec-head"><div class="t">数据</div><div class="d">备份 / 同步 / 下载 / 销毁当前项目。</div></div>
+              <div class="sec-card">
+                <div class="data-controls" style="border-top:none;padding-top:0;">
+                  <button onclick="window.saveBackup()">💾 备份</button>
+                  <button onclick="window.restoreBackup()">🔄 同步</button>
+                  <button onclick="window.downloadBackup()">⬇️ 下载</button>
+                  <button class="destroy" onclick="window.destroyProject()">💥 销毁</button>
+                </div>
+                <div class="hint">销毁不可逆：会彻底删除该项目的文件、云端备份与容器。</div>
+              </div>
+            </section>
+
+            <!-- Hermes -->
+            <section class="settings-section" data-sec="hermes">
+              <div class="sec-head"><div class="t">Hermes 云端秘书</div><div class="d">独立加固沙箱里跑你自己的 agent；绑定自有模型/连接器，严格限额、跨用户隔离。默认关闭。</div></div>
+              <div class="sec-card">
+                <div id="hermesStatus" class="hint">未启用。</div>
+                <div class="row">
+                  <select id="hermesProvider" class="input">
+                    <option value="">选择模型 provider</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="deepseek">DeepSeek</option>
+                    <option value="openrouter">OpenRouter</option>
+                    <option value="custom">自定义</option>
+                  </select>
+                  <input type="password" id="hermesKey" class="input" placeholder="Hermes 模型 API Key">
+                </div>
+                <div class="cap">连接器开关</div>
+                <div class="hint">⚠️ 当前为<b>骨架版</b>：开关与额度可保存，但 Telegram/QQ/微信等的<b>真实收发尚未接入</b>（属下一阶段）。现在开启不会真的连上聊天平台。</div>
+                <div id="hermesConnectors" style="display:flex;flex-wrap:wrap;gap:0.5rem;font-size:0.78rem;"></div>
+                <div class="cap">工具权限（默认只读，最小授权）</div>
+                <div id="hermesTools" style="display:flex;flex-wrap:wrap;gap:0.5rem;font-size:0.78rem;"></div>
+                <div class="row">
+                  <input type="number" id="hermesBudgetTokens" class="input" placeholder="每日 token 预算">
+                  <input type="number" id="hermesBudgetMsgs" class="input" placeholder="每日消息预算">
+                </div>
+                <div class="data-controls" style="border-top:none;padding-top:0;">
+                  <button onclick="window.saveHermes()">💾 保存</button>
+                  <button onclick="window.startHermes()">▶️ 启动</button>
+                  <button onclick="window.stopHermes()">⏹️ 停止</button>
+                  <button onclick="window.refreshHermes()">🔄 刷新</button>
+                </div>
+              </div>
+            </section>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <main>
+      <!-- 1. 遥控对话 -->
+      <div class="panel active" id="chatPanel">
+        <div class="tool-bar">
+          <span class="tool-chip" style="border:none;background:transparent;color:var(--text-muted);padding-left:0;">对话：</span>
+          <select id="chatProvider" class="chat-select" onchange="window.onChatProviderChange(this.value)" title="选择对话平台">
+            <option value="claude">Claude</option>
+            <option value="codex">Codex</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="glm">GLM / 智谱</option>
+            <option value="kimi">Kimi / Moonshot</option>
+            <option value="qwen">通义 / Qwen</option>
+          </select>
+          <select id="chatModelSelect" class="chat-select" onchange="window.onChatModelChange()" title="选择同平台模型"></select>
+          <input type="text" id="chatCustomModel" class="chat-select model-custom-input" placeholder="模型 ID" oninput="window.onChatCustomModelInput()">
+          <button id="launchSelectedTool" class="tool-chip" onclick="window.launchSelectedTool()" title="在终端启动当前平台">
+            <i class="fa-solid fa-terminal"></i> <span id="launchSelectedLabel">DeepSeek</span> 终端
+          </button>
+          <span id="chatCredentialStatus" class="model-status">检查账号中…</span>
+        </div>
+        <div id="convBar" style="display:flex;align-items:center;gap:0.4rem;padding:0.35rem 0.6rem;border-bottom:1px solid var(--border);background:var(--surface-2);font-size:0.78rem;flex-wrap:wrap;">
+          <span style="color:var(--text-muted);"><i class="fa-solid fa-comments"></i> 会话</span>
+          <select id="convSelect" class="chat-select" style="flex:1;min-width:120px;max-width:none;" onchange="window.switchConversation(this.value)"></select>
+          <button class="tool-chip" onclick="window.newChat()" title="新建一个对话（保留旧对话可切回）"><i class="fa-solid fa-plus"></i> 新对话</button>
+          <button class="tool-chip" onclick="window.deleteConversation()" title="删除当前对话">🗑</button>
+        </div>
+        <div id="collabBar" style="display:none;flex-wrap:wrap;align-items:center;gap:0.4rem;padding:0.35rem 0.6rem;border-bottom:1px solid var(--border);background:var(--surface-2);font-size:0.76rem;">
+          <span id="collabMembers" style="color:var(--text-muted);">👥 —</span>
+          <span id="collabLocks" style="color:var(--text-muted);flex:1;min-width:120px;">🔓 无锁定</span>
+          <input type="text" id="lockFiles" class="input" style="width:130px;padding:0.2rem 0.4rem;font-size:0.74rem;" placeholder="src/a.js,b.css">
+          <button class="mini-btn" onclick="window.lockFilesNow()">🔒锁</button>
+          <button class="mini-btn" onclick="window.unlockFilesNow()">解锁</button>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+          <div class="msg-wrapper ai">
+            <div class="msg-bubble">
+              👋 欢迎使用云端 AI 编程遥控器。<br>
+              ① 右上角【设置】新建/选择项目 →【激活并连接沙箱】，并绑定 API Key 或完成会员登录<br>
+              ② 上方选<b>平台 + 模型</b>（同平台可切换模型或填自定义模型 ID）<br>
+              ③ 在下面发消息，AI 在云端写代码、回复显示在这里；起了网页服务可在【预览】看效果<br>
+              想要交互式 Yes/No 批准，去【终端】手动跑 claude / codex。
+            </div>
+          </div>
+        </div>
+        <div class="input-bar-container">
+          <div class="pill-input-box">
+            <textarea id="chatInput" rows="1" placeholder="发送遥控指令给 AI 工具…" oninput="window.autoGrow(this)" onkeydown="window.handleInputKey(event)"></textarea>
+            <button class="send-pill-btn" id="chatSendBtn" onclick="window.sendChatInstruction()"><i class="fa-solid fa-arrow-up"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. 终端 -->
+      <div class="panel" id="terminalPanel">
+        <div class="card-header">
+          <span><i class="fa-solid fa-terminal"></i> 交互终端</span>
+          <div class="terminal-actions">
+            <button onclick="window.loginTool('claude')" title="自动发送 Claude /login">Claude 登录</button>
+            <button onclick="window.loginTool('codex')" title="运行 codex login">Codex 登录</button>
+            <button onclick="window.clearTerminal()">清屏</button>
+            <button onclick="window.restartTerminal()">重启</button>
+          </div>
+        </div>
+        <div id="terminalLoginHelper" class="terminal-login-helper">
+          <div class="login-helper-head">
+            <div id="loginHelperTitle" class="login-helper-title">账号登录助手</div>
+            <button class="login-helper-close" onclick="window.hideLoginHelper()" title="关闭">×</button>
+          </div>
+          <div id="loginHelperHint" class="login-helper-hint">点击 Claude/Codex 登录后，这里会显示官方授权链接。</div>
+          <div class="login-helper-actions">
+            <button id="loginOpenBtn" class="primary" onclick="window.openLoginUrl()">打开官方登录页</button>
+            <button id="loginCopyBtn" onclick="window.copyLoginUrl()">复制链接</button>
+            <button onclick="window.finishLoginHelper()">我已完成登录</button>
+          </div>
+          <div id="loginUrlBox" class="login-url-box"></div>
+          <div class="login-code-row">
+            <input id="loginCodeInput" class="input" placeholder="粘贴授权码，或授权后跳转的完整链接(含 ?code=)" onkeydown="if(event.key==='Enter')window.submitLoginCode()">
+            <button onclick="window.submitLoginCode()">提交授权码</button>
+          </div>
+          <div id="loginCodeHint" class="login-code-hint">不会在本站输入 Claude/OpenAI 密码，只跳转官方页面授权。</div>
+        </div>
+        <div class="term-container" id="terminalContainer"></div>
+      </div>
+
+      <!-- 3. 网页预览 -->
+      <div class="panel" id="previewPanel">
+        <div class="card-header">
+          <span><i class="fa-solid fa-globe"></i> 网页预览</span>
+          <span class="preview-toolbar">
+            <select id="previewPort" class="input preview-select" onchange="window.loadPreview()"></select>
+            <select id="previewPathSelect" class="input preview-select" onchange="window.onPreviewPathSelect()">
+              <option value="/">首页 /</option>
+              <option value="/index.html">index.html</option>
+              <option value="/about.html">about.html</option>
+              <option value="/login.html">login.html</option>
+              <option value="/dashboard.html">dashboard.html</option>
+              <option value="__custom">自定义路径...</option>
+            </select>
+            <input id="previewPath" class="input preview-path-custom" placeholder="/ 或 /about.html" onkeydown="if(event.key==='Enter')window.loadPreview()">
+            <button onclick="window.startStaticServer()" title="为静态网页（HTML）一键启动服务器">🌐 启动服务器</button>
+            <button onclick="window.loadPreview()" title="刷新">🔄</button>
+            <button onclick="window.openPreviewNewTab()" title="新窗口打开">↗</button>
+            <button onclick="window.makePreviewLink()" title="生成可分享的临时链接">🔗</button>
+          </span>
+        </div>
+        <div class="preview-container">
+          <iframe id="previewIframe" class="preview-iframe" style="display:none;"></iframe>
+          <div id="previewEmpty" class="preview-empty">
+            <i class="fa-solid fa-window-maximize"></i>
+            <span>做的是静态网页（HTML）？点下面一键起服务器即可预览</span>
+            <button onclick="window.startStaticServer()" style="margin-top:.8rem;padding:.5rem 1rem;border-radius:10px;background:var(--accent,#C96442);color:#fff;border:none;font-weight:600;">🌐 启动服务器并预览</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <div class="mobile-float-bar">
+      <div class="float-item active" id="tab-chat" onclick="window.switchTab('chat')"><i class="fa-solid fa-comment"></i> 遥控</div>
+      <div class="float-item" id="tab-terminal" onclick="window.switchTab('terminal')"><i class="fa-solid fa-terminal"></i> 终端</div>
+      <div class="float-item" id="tab-preview" onclick="window.switchTab('preview')"><i class="fa-solid fa-rocket"></i> 预览</div>
+    </div>
+  </div>
+
+</body>
+</html>

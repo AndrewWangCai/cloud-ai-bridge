@@ -1,0 +1,4 @@
+# 加速构建上下文上传：宿主机的 node_modules（含 Windows 版 node-pty）不进镜像
+agent/node_modules
+**/*.log
+**/.DS_Store

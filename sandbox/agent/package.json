@@ -1,0 +1,15 @@
+{
+  "name": "sandbox-agent",
+  "version": "1.0.0",
+  "description": "Daemon process running inside the Docker sandbox to interface between Conduit Server and AI CLI tools.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "optionalDependencies": {
+    "node-pty": "^1.1.0-beta4"
+  }
+}

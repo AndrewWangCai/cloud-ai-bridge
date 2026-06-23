@@ -1,0 +1,17 @@
+{
+  "name": "mobile-cloud-ai-bridge",
+  "version": "1.0.0",
+  "description": "Root package for Mobile Cloud AI Bridge prototype",
+  "scripts": {
+    "install-all": "npm install --prefix conduit && npm install --prefix sandbox/agent",
+    "conduit": "npm start --prefix conduit",
+    "agent": "npm start --prefix sandbox/agent",
+    "dev": "node start-dev.js",
+    "build:image": "docker build -t sandbox-image:latest sandbox",
+    "test:conduit": "node test-conduit.js",
+    "update": "bash deploy/update.sh"
+  },
+  "dependencies": {
+    "puppeteer-core": "^25.1.0"
+  }
+}

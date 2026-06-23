@@ -1,0 +1,24 @@
+# systemd 单元：常驻 Conduit。安装：
+#   sudo cp deploy/conduit.service /etc/systemd/system/conduit.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now conduit
+#   sudo journalctl -u conduit -f      # 看日志
+[Unit]
+Description=Cloud AI Bridge - Conduit Server
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+# Conduit 需访问 /var/run/docker.sock 来编排容器，故以 root 运行（或换成 docker 组用户）。
+User=root
+WorkingDirectory=/opt/ai-sandbox/app/conduit
+EnvironmentFile=/opt/ai-sandbox/secrets/conduit.env
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=3
+# 适度沙箱化宿主进程（注意：仍需能读写 workspaces/backups/data 与 docker.sock）
+NoNewPrivileges=false
+
+[Install]
+WantedBy=multi-user.target

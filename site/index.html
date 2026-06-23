@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cloud AI Bridge · 手机遥控云端 AI 编程</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  :root{--bg:#F4F3EE;--surface:#fff;--surface2:#FAF9F5;--border:#E7E4DA;--text:#2A2A27;--muted:#76746B;--accent:#C96442;--accent-hover:#B5573A;--accent-soft:rgba(201,100,66,.10);--ok:#3F8F5B;--shadow:0 6px 24px rgba(40,38,34,.08);}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter',-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased;}
+  a{color:inherit;text-decoration:none;}
+  .wrap{max-width:920px;margin:0 auto;padding:0 1.2rem;}
+  .btn{display:inline-flex;align-items:center;gap:.5rem;border-radius:12px;padding:.7rem 1.3rem;font-weight:600;font-size:.95rem;border:1px solid transparent;cursor:pointer;transition:.15s;}
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-primary:hover{background:var(--accent-hover);}
+  .btn-ghost{background:var(--surface);color:var(--text);border-color:var(--border);}
+  .btn-ghost:hover{background:var(--surface2);}
+  /* 顶栏 */
+  header{position:sticky;top:0;z-index:10;background:rgba(244,243,238,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);}
+  header .wrap{display:flex;align-items:center;justify-content:space-between;height:60px;}
+  .brand{display:flex;align-items:center;gap:.6rem;font-weight:700;font-size:1.05rem;}
+  .spark{width:30px;height:30px;border-radius:9px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;}
+  .nav-links{display:flex;gap:.6rem;align-items:center;}
+  /* Hero */
+  .hero{text-align:center;padding:3.4rem 0 2.6rem;}
+  .hero .tag{display:inline-block;font-size:.78rem;color:var(--accent);background:var(--accent-soft);padding:.3rem .8rem;border-radius:999px;font-weight:600;margin-bottom:1.1rem;}
+  .hero h1{font-size:2.2rem;font-weight:800;letter-spacing:-.02em;margin-bottom:.9rem;}
+  .hero p.sub{font-size:1.05rem;color:var(--muted);max-width:600px;margin:0 auto 1.6rem;}
+  .hero .cta{display:flex;gap:.7rem;justify-content:center;flex-wrap:wrap;}
+  .soon{display:none;font-size:.8rem;color:var(--muted);margin-top:.9rem;}
+  /* 通用 section */
+  section{padding:2.2rem 0;}
+  .sec-title{font-size:1.4rem;font-weight:700;text-align:center;margin-bottom:.4rem;}
+  .sec-sub{text-align:center;color:var(--muted);margin-bottom:1.6rem;font-size:.92rem;}
+  /* 功能卡 */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:1rem;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.2rem;}
+  .card .ic{width:40px;height:40px;border-radius:11px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:1.1rem;margin-bottom:.7rem;}
+  .card h3{font-size:1rem;margin-bottom:.3rem;}
+  .card p{font-size:.86rem;color:var(--muted);}
+  /* 步骤 */
+  .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;}
+  .step{background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:1.2rem;}
+  .step .n{width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;margin-bottom:.6rem;}
+  .step h3{font-size:.98rem;margin-bottom:.25rem;}
+  .step p{font-size:.85rem;color:var(--muted);}
+  /* 模型标签 */
+  .models{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:center;}
+  .chip{background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:.4rem .9rem;font-size:.85rem;font-weight:500;}
+  /* 安全条 */
+  .safe{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.3rem 1.4rem;}
+  .safe ul{list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.5rem .9rem;}
+  .safe li{font-size:.86rem;color:var(--text);display:flex;gap:.5rem;align-items:flex-start;}
+  .safe li i{color:var(--ok);margin-top:.2rem;}
+  /* CTA 尾 */
+  .cta-band{background:var(--accent);color:#fff;border-radius:20px;text-align:center;padding:2.4rem 1.4rem;margin:1rem 0;}
+  .cta-band h2{font-size:1.5rem;margin-bottom:.5rem;}
+  .cta-band p{opacity:.92;margin-bottom:1.2rem;}
+  .cta-band .btn-primary{background:#fff;color:var(--accent);}
+  footer{text-align:center;color:var(--muted);font-size:.8rem;padding:2rem 0 2.4rem;}
+  @media(max-width:560px){.hero h1{font-size:1.75rem;}.hero p.sub{font-size:.95rem;}.nav-links .btn{padding:.5rem .8rem;font-size:.85rem;}}
+</style>
+</head>
+<body>
+  <header><div class="wrap">
+    <div class="brand"><span class="spark"><i class="fa-solid fa-bolt"></i></span> Cloud AI Bridge</div>
+    <div class="nav-links">
+      <a class="btn btn-ghost" href="help.html">帮助</a>
+      <a class="btn btn-primary" data-app href="#"><i class="fa-solid fa-rocket"></i> 开始使用</a>
+    </div>
+  </div></header>
+
+  <main class="wrap">
+    <section class="hero">
+      <span class="tag">手机优先 · 云端隔离沙箱</span>
+      <h1>把手机变成你的云端 AI 编程遥控器</h1>
+      <p class="sub">登录后获得一个隔离的云端开发环境，在手机上远程指挥 Claude / Codex / DeepSeek / GLM / Kimi / 通义 写代码、跑项目、测网页、推 Git——随时随地，开箱即用。</p>
+      <div class="cta">
+        <a class="btn btn-primary" data-app href="#"><i class="fa-solid fa-rocket"></i> 立即开始</a>
+        <a class="btn btn-ghost" href="help.html"><i class="fa-solid fa-circle-question"></i> 看看怎么用</a>
+      </div>
+      <p class="soon" id="soonNote">🚧 应用正在内测，公开入口即将开放——先看看怎么用。</p>
+    </section>
+
+    <section>
+      <div class="sec-title">能做什么</div>
+      <div class="sec-sub">一个轻量、聚焦的「临时 AI 编程云沙箱」</div>
+      <div class="grid">
+        <div class="card"><div class="ic"><i class="fa-solid fa-mobile-screen-button"></i></div><h3>手机遥控</h3><p>对话模式像聊天一样发指令，AI 在云端写代码、回结果；也可切到网页终端手敲命令。</p></div>
+        <div class="card"><div class="ic"><i class="fa-brands fa-docker"></i></div><h3>隔离沙箱</h3><p>每个项目 = 一个独立加固的 Docker 容器，1 核 1G，资源/网络受限，互不干扰。</p></div>
+        <div class="card"><div class="ic"><i class="fa-solid fa-layer-group"></i></div><h3>多模型自带</h3><p>填自己的 API Key 即用，多家模型自由切换，用量走你自己的账号。</p></div>
+        <div class="card"><div class="ic"><i class="fa-solid fa-globe"></i></div><h3>网页实时预览</h3><p>起了 dev server 一键预览，多端口切换、刷新、生成可分享的临时链接。</p></div>
+        <div class="card"><div class="ic"><i class="fa-brands fa-github"></i></div><h3>Git 一键保存</h3><p>Git 助手生成命令一键复制；连接 GitHub 后可一键建仓、提交并开 PR。</p></div>
+        <div class="card"><div class="ic"><i class="fa-solid fa-users"></i></div><h3>多人协作</h3><p>邀请伙伴进同一项目，多人 + 多 AI 共建；文件互斥锁避免互相覆盖。</p></div>
+        <div class="card"><div class="ic"><i class="fa-solid fa-city"></i></div><h3>作品社区</h3><p>愿意的话把项目公开到社区供大家观赏，可选「仅观赏 / 可获取」。</p></div>
+        <div class="card"><div class="ic"><i class="fa-solid fa-box-archive"></i></div><h3>自动备份</h3><p>项目到期自动停止并备份；保留期内可下载、恢复、推到自己的 Git。</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-title">支持的模型</div>
+      <div class="sec-sub">自带 Key，随时切换 · 国内部署推荐用国产模型（稳定无地区限制）</div>
+      <div class="models">
+        <span class="chip">DeepSeek</span><span class="chip">GLM / 智谱</span><span class="chip">Kimi / Moonshot</span><span class="chip">通义 / Qwen</span>
+        <span class="chip" style="opacity:.6">Claude</span><span class="chip" style="opacity:.6">Codex</span>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-title">三步上手</div>
+      <div class="sec-sub">几分钟跑通第一个项目</div>
+      <div class="steps">
+        <div class="step"><div class="n">1</div><h3>注册登录</h3><p>用邮箱注册，收激活码激活；下次用户名+密码登录。</p></div>
+        <div class="step"><div class="n">2</div><h3>建项目 · 绑 Key</h3><p>新建项目、激活沙箱，填一个 AI 的 API Key。</p></div>
+        <div class="step"><div class="n">3</div><h3>开始干活</h3><p>对话或终端里指挥 AI 写代码，预览效果，推到 Git。</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-title">安全与隐私</div>
+      <div class="sec-sub">隔离优先，凭证私有</div>
+      <div class="safe"><ul>
+        <li><i class="fa-solid fa-check"></i> 每项目独立容器，cap-drop / no-new-priv / 限额 / 专网</li>
+        <li><i class="fa-solid fa-check"></i> 禁 privileged / host 网络 / docker.sock</li>
+        <li><i class="fa-solid fa-check"></i> API Key 仅注入你的容器，浏览器拿不到</li>
+        <li><i class="fa-solid fa-check"></i> 跨用户越权 / 路径穿越防护，日志脱敏</li>
+        <li><i class="fa-solid fa-check"></i> 出网加固：禁云元数据 / 内网 / SMTP 滥用</li>
+        <li><i class="fa-solid fa-check"></i> 到期自动备份、超期销毁，数据可控</li>
+      </ul></div>
+    </section>
+
+    <div class="cta-band">
+      <h2>现在就上手</h2>
+      <p>手机打开就能用，几分钟跑通你的第一个云端项目。</p>
+      <a class="btn btn-primary" data-app href="#"><i class="fa-solid fa-rocket"></i> 进入应用</a>
+    </div>
+  </main>
+
+  <footer>Cloud AI Bridge · 手机遥控云端 AI 编程　|　<a href="help.html" style="color:var(--accent);">帮助中心</a> · <a href="https://github.com/AndrewWangCai/cloud-ai-bridge" style="color:var(--accent);">开源代码</a></footer>
+
+  <script>
+    // ▼▼▼ 应用上线后，把下面这行改成你的域名即可，例如 "https://aicloudcoding.top" ▼▼▼
+    var APP_URL = "";
+    // ▲▲▲ 留空 = 显示「内测中」，按钮指向帮助页（不暴露服务器 IP）▲▲▲
+    document.querySelectorAll('[data-app]').forEach(function (a) {
+      if (APP_URL) { a.href = APP_URL; }
+      else { a.href = 'help.html'; a.title = '应用内测中，即将开放公开入口'; }
+    });
+    if (!APP_URL) { var n = document.getElementById('soonNote'); if (n) n.style.display = 'block'; }
+  </script>
+</body>
+</html>

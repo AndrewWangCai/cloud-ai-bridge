@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cloud AI Bridge · 管理员后台</title>
+<style>
+  :root{--bg:#F4F3EE;--surface:#fff;--border:#E7E4DA;--text:#2A2A27;--muted:#76746B;--accent:#C96442;--danger:#C0492F;--ok:#3F8F5B;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter',-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);padding:1rem;max-width:1100px;margin:0 auto;}
+  h1{font-size:1.25rem;display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem;}
+  .muted{color:var(--muted);font-size:.85rem;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1rem;margin-top:1rem;box-shadow:0 1px 2px rgba(40,38,34,.05);}
+  .card h2{font-size:.95rem;margin-bottom:.7rem;}
+  .stats{display:flex;gap:1rem;flex-wrap:wrap;}
+  .stat{flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:.8rem;}
+  .stat .n{font-size:1.6rem;font-weight:700;color:var(--accent);}
+  .stat .l{font-size:.72rem;color:var(--muted);}
+  table{width:100%;border-collapse:collapse;font-size:.82rem;}
+  th,td{text-align:left;padding:.45rem .5rem;border-bottom:1px solid var(--border);}
+  th{color:var(--muted);font-weight:600;font-size:.72rem;text-transform:uppercase;}
+  button{font-family:inherit;cursor:pointer;border:1px solid var(--border);background:var(--surface);border-radius:8px;padding:.3rem .6rem;font-size:.75rem;color:var(--text);}
+  button.accent{background:var(--accent);color:#fff;border-color:var(--accent);}
+  button.danger{color:var(--danger);border-color:rgba(192,73,47,.3);}
+  input{font-family:inherit;border:1px solid var(--border);border-radius:8px;padding:.4rem .6rem;font-size:.85rem;}
+  code{background:var(--bg);padding:.1rem .3rem;border-radius:4px;font-size:.78rem;}
+  .toggle{display:inline-flex;align-items:center;gap:.4rem;margin-right:1rem;font-size:.82rem;}
+  .pill{font-size:.7rem;padding:.1rem .4rem;border-radius:6px;background:var(--bg);}
+  .err{color:var(--danger);}
+  a.back{font-size:.8rem;color:var(--accent);text-decoration:none;}
+</style>
+</head>
+<body>
+  <h1>🛡️ 管理员后台 <span class="muted" id="whoami"></span></h1>
+  <a class="back" href="/">← 返回应用</a>
+  <div id="gate" class="card" style="display:none;"></div>
+  <div id="content" style="display:none;">
+    <div class="stats" id="stats"></div>
+    <div class="card">
+      <h2>宿主机 / 容器资源 <button onclick="loadMetrics()" style="float:right;">刷新</button></h2>
+      <div id="hostMetrics" class="stats" style="margin-bottom:.6rem;"></div>
+      <table id="containerMetrics"></table>
+    </div>
+    <div class="card">
+      <h2>运营数据（漏斗 / 风控）</h2>
+      <div id="opsCounters" class="stats" style="margin-bottom:.6rem;"></div>
+      <div class="muted" style="margin-bottom:.3rem;">转化漏斗（注册 → 创建 → 激活 → 终端 → Git → 预览 → 备份）</div>
+      <table id="funnel"></table>
+    </div>
+    <div class="card">
+      <h2>IP 封禁 / 注册风控</h2>
+      <div style="margin-bottom:.6rem;display:flex;gap:.5rem;flex-wrap:wrap;">
+        <input id="banIpInput" placeholder="要封禁的 IP（如 1.2.3.4）">
+        <input id="banIpNote" placeholder="备注（可选）">
+        <button class="danger" onclick="banIp()">封禁 IP</button>
+      </div>
+      <table id="bannedIps"></table>
+    </div>
+    <div class="card"><h2>全局开关</h2><div id="settings"></div></div>
+    <div class="card">
+      <h2>邀请码</h2>
+      <div style="margin-bottom:.6rem;display:flex;gap:.5rem;">
+        <input id="inviteNote" placeholder="备注（可选）">
+        <button class="accent" onclick="createInvite()">生成邀请码</button>
+        <button class="danger" onclick="revokePreviews()">撤销所有预览链接</button>
+      </div>
+      <table id="invites"></table>
+    </div>
+    <div class="card"><h2>Hermes 云端秘书</h2><table id="hermes"></table></div>
+    <div class="card"><h2>社区作品（内容审核）</h2><table id="community"></table></div>
+    <div class="card"><h2>用户</h2><table id="users"></table></div>
+    <div class="card"><h2>项目 / 容器</h2><table id="projects"></table></div>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+async function api(path, body){
+  const opt = body ? {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)} : {};
+  const r = await fetch(path, opt);
+  if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.error || ('HTTP '+r.status)); }
+  return r.json();
+}
+function esc(s){ return String(s).replace(/[&<>]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function fmt(iso){ return iso ? new Date(iso).toLocaleString() : '-'; }
+
+async function load(){
+  let data;
+  try { data = await api('/api/admin/overview'); }
+  catch(e){ $('gate').style.display='block'; $('gate').innerHTML = '<span class="err">无法访问：'+esc(e.message)+'</span><br>请用管理员账号登录后再访问本页。'; return; }
+  $('content').style.display='block';
+
+  $('stats').innerHTML = [
+    ['用户', data.users.length],['项目', data.projects.length],
+    ['运行中容器', data.runningContainers],['有效预览', data.activePreviewTokens]
+  ].map(([l,n])=>`<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+
+  const s = data.settings;
+  $('settings').innerHTML = Object.keys(s).map((k)=>
+    `<label class="toggle"><input type="checkbox" ${s[k]?'checked':''} onchange="setSetting('${k}',this.checked)"> ${k}</label>`
+  ).join('');
+
+  $('invites').innerHTML = '<tr><th>邀请码</th><th>备注</th><th>状态</th><th></th></tr>' +
+    data.invites.map((i)=>`<tr><td><code>${esc(i.code)}</code></td><td>${esc(i.note||'')}</td>`+
+      `<td>${i.disabled?'<span class="pill">已禁用</span>':(i.usedBy?('已用 by '+esc(i.usedBy)):'<span class="pill">可用</span>')}</td>`+
+      `<td>${(!i.disabled&&!i.usedBy)?`<button class="danger" onclick="disableInvite('${esc(i.code)}')">禁用</button>`:''}</td></tr>`
+    ).join('');
+
+  $('users').innerHTML = '<tr><th>用户</th><th>邮箱</th><th>项目数</th><th>注册时间</th><th>登录IP</th><th>状态</th><th></th></tr>' +
+    data.users.map((u)=>{ const ip = u.lastLoginIp || u.registeredIp; return `<tr><td>${esc(u.id)}</td><td>${esc(u.email||'-')}</td><td>${u.projectCount}</td><td>${fmt(u.createdAt)}</td>`+
+      `<td><code>${esc(u.lastLoginIp||u.registeredIp||'-')}</code></td>`+
+      `<td>${u.banned?'<span class="pill err">已封禁</span>':(u.activated===false?'<span class="pill">未激活</span>':'正常')}</td>`+
+      `<td><button onclick="ban('${esc(u.id)}',${!u.banned})">${u.banned?'解封':'封禁'}</button>`+
+      `${ip?` <button class="danger" onclick="banIpVal('${esc(ip)}','user:${esc(u.id)}')">封IP</button>`:''}</td></tr>`;}
+    ).join('');
+
+  const mt = data.metrics || {counters:{},funnel:[]};
+  const c = mt.counters||{};
+  $('opsCounters').innerHTML = [
+    ['失败登录', c.failedLogins||0],['IP注册拦截', c.registerBlockedIp||0],
+    ['预览点击', c.previewClicks||0],['出站超限强停', c.egressKills||0],
+    ['OOM 次数', c.oomKills||0],
+    ['平均使用时长', (mt.avgSessionMin||0)+' 分'],
+    ['容器均运行', (mt.avgContainerMin||0)+' 分'],['会话样本', mt.sessionCount||0]
+  ].map(([l,n])=>`<div class="stat"><div class="n" style="font-size:1.2rem;">${esc(String(n))}</div><div class="l">${l}</div></div>`).join('');
+  const maxF = Math.max(1, ...(mt.funnel||[]).map(f=>f.count));
+  $('funnel').innerHTML = '<tr><th>阶段</th><th>次数</th><th></th></tr>' +
+    (mt.funnel||[]).map(f=>`<tr><td>${esc(f.stage)}</td><td>${f.count}</td>`+
+      `<td><div style="background:var(--accent);height:10px;border-radius:5px;width:${Math.round(f.count/maxF*100)}%;min-width:2px;"></div></td></tr>`).join('');
+
+  $('hermes').innerHTML = '<tr><th>用户</th><th>状态</th><th>provider</th><th>连接器</th><th>今日用量</th><th></th></tr>' +
+    ((data.hermes||[]).length ? data.hermes.map(h=>{ const conns=Object.entries(h.connectors||{}).filter(([,v])=>v).map(([k])=>k).join(',')||'-';
+      return `<tr><td>${esc(h.userId)}</td><td>${esc(h.status)}</td><td>${esc(h.provider||'-')}</td><td>${esc(conns)}</td>`+
+      `<td>${h.usage.tokens}tok/${h.usage.messages}msg</td>`+
+      `<td>${h.status==='RUNNING'?`<button class="danger" onclick="stopHermes('${esc(h.userId)}')">停止</button>`:''}</td></tr>`;}).join('')
+      : '<tr><td colspan="6" class="muted">暂无用户启用 Hermes</td></tr>');
+
+  $('community').innerHTML = '<tr><th>作者</th><th>标题</th><th>级别</th><th>发布时间</th><th></th></tr>' +
+    ((data.community||[]).length ? data.community.map(c=>`<tr><td>${esc(c.author)}</td><td>${esc(c.title)}</td>`+
+      `<td>${c.level==='fork'?'可获取':'仅观赏'}</td><td>${fmt(c.publishedAt)}</td>`+
+      `<td><button onclick="window.open('/community-view/'+encodeURIComponent('${esc(c.entryId)}')+'/','_blank')">查看</button> `+
+      `<button class="danger" onclick="takedown('${esc(c.entryId)}')">下架</button></td></tr>`).join('')
+      : '<tr><td colspan="5" class="muted">暂无公开作品</td></tr>');
+
+  $('bannedIps').innerHTML = '<tr><th>IP</th><th>备注</th><th>封禁时间</th><th></th></tr>' +
+    ((data.bannedIps||[]).length ? data.bannedIps.map(b=>`<tr><td><code>${esc(b.ip)}</code></td><td>${esc(b.note||'')}</td><td>${fmt(b.bannedAt)}</td>`+
+      `<td><button onclick="unbanIp('${esc(b.ip)}')">解封</button></td></tr>`).join('')
+      : '<tr><td colspan="4" class="muted">暂无封禁 IP</td></tr>');
+
+  $('projects').innerHTML = '<tr><th>用户/项目</th><th>状态</th><th>在线</th><th>到期</th><th>激活失败原因</th><th></th></tr>' +
+    data.projects.map((p)=>`<tr><td>${esc(p.userId)}/${esc(p.projectId)}</td><td>${esc(p.status)}</td>`+
+      `<td>${p.online?'🟢':'⚪'}</td><td>${fmt(p.expiresAt)}</td>`+
+      `<td class="err" style="max-width:280px;font-size:.72rem;">${p.activationFailureReason?esc(p.activationFailureReason):''}</td>`+
+      `<td><button onclick="stopP('${esc(p.userId)}','${esc(p.projectId)}')">停止</button> `+
+      `<button class="danger" onclick="destroyP('${esc(p.userId)}','${esc(p.projectId)}')">销毁</button></td></tr>`
+    ).join('');
+  loadMetrics();
+}
+async function loadMetrics(){
+  let m; try{ m = await api('/api/admin/metrics'); }catch(e){ return; }
+  const h = m.host||{};
+  $('hostMetrics').innerHTML = [
+    ['CPU 负载(1m)', (h.load1!=null?h.load1:'-')+' / '+(h.cpuCount||'?')+'核'],
+    ['内存', (h.memUsedGB||0)+'/'+(h.memTotalGB||0)+'G ('+(h.memUsedPct||0)+'%)'],
+    ['磁盘(workspaces)', (h.disk||'-')]
+  ].map(([l,n])=>`<div class="stat"><div class="n" style="font-size:.95rem;word-break:break-all;">${esc(String(n))}</div><div class="l">${l}</div></div>`).join('');
+  const rows = m.containers||[];
+  $('containerMetrics').innerHTML = '<tr><th>容器</th><th>CPU</th><th>内存</th><th>内存%</th><th>进程</th><th>出站(NetIO)</th><th>运行时长</th></tr>' +
+    (rows.length ? rows.map(c=>`<tr><td>${esc(c.name||'')}</td><td>${esc(c.cpu||'')}</td><td>${esc(c.mem||'')}</td><td>${esc(c.memPct||'')}</td><td>${esc(c.pids||'')}</td><td>${esc(c.netIO||'')}</td><td>${esc(c.uptime||'')}</td></tr>`).join('')
+      : '<tr><td colspan="7" class="muted">无运行中容器（或非 Docker 模式）</td></tr>');
+}
+async function setSetting(key,value){ try{ await api('/api/admin/settings',{key,value}); }catch(e){alert(e.message);} }
+async function createInvite(){ try{ await api('/api/admin/invites',{note:$('inviteNote').value}); $('inviteNote').value=''; load(); }catch(e){alert(e.message);} }
+async function disableInvite(code){ try{ await api('/api/admin/invites/'+code+'/disable'); load(); }catch(e){alert(e.message);} }
+async function ban(id,banned){ if(!confirm((banned?'封禁':'解封')+' '+id+' ?'))return; try{ await api('/api/admin/users/'+id+'/ban',{banned}); load(); }catch(e){alert(e.message);} }
+async function stopP(u,p){ try{ await api('/api/admin/projects/'+u+'/'+p+'/stop'); load(); }catch(e){alert(e.message);} }
+async function destroyP(u,p){ if(!confirm('彻底销毁 '+u+'/'+p+' ?'))return; try{ await api('/api/admin/projects/'+u+'/'+p+'/destroy'); load(); }catch(e){alert(e.message);} }
+async function revokePreviews(){ try{ const r=await api('/api/admin/previews/revoke'); alert('已撤销 '+r.revoked+' 个'); load(); }catch(e){alert(e.message);} }
+async function banIp(){ const ip=$('banIpInput').value.trim(); if(!ip)return alert('请输入 IP'); await banIpVal(ip, $('banIpNote').value); $('banIpInput').value=''; $('banIpNote').value=''; }
+async function banIpVal(ip,note){ if(!confirm('封禁 IP '+ip+' ?'))return; try{ await api('/api/admin/ip/ban',{ip,note}); load(); }catch(e){alert(e.message);} }
+async function unbanIp(ip){ try{ await api('/api/admin/ip/unban',{ip}); load(); }catch(e){alert(e.message);} }
+async function stopHermes(uid){ if(!confirm('停止 '+uid+' 的 Hermes ?'))return; try{ await api('/api/admin/hermes/'+uid+'/stop'); load(); }catch(e){alert(e.message);} }
+async function takedown(id){ if(!confirm('下架该作品？'))return; try{ await api('/api/admin/community/'+encodeURIComponent(id)+'/takedown'); load(); }catch(e){alert(e.message);} }
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+# 跨平台行尾：仓库内统一 LF，保证 .sh 脚本在 Linux 服务器上能直接运行
+* text=auto eol=lf
+*.sh text eol=lf
+Dockerfile text eol=lf
